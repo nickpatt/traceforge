@@ -1,0 +1,23 @@
+# Binaries
+/bin/
+/out/
+*.exe
+*.test
+*.out
+
+# Go
+/vendor/
+go.work
+go.work.sum
+
+# Env / local
+.env
+*.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Data
+ch-data/
