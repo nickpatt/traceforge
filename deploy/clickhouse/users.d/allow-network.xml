@@ -1,0 +1,15 @@
+<clickhouse>
+  <!--
+    The stock ClickHouse image restricts the `default` user to localhost.
+    TraceForge's services connect over the Docker network, so we widen the
+    allowed networks for local/dev use. Do NOT use this in production; create a
+    dedicated, credentialed user instead.
+  -->
+  <users>
+    <default>
+      <networks replace="replace">
+        <ip>::/0</ip>
+      </networks>
+    </default>
+  </users>
+</clickhouse>
