@@ -28,14 +28,17 @@ func (q *Queries) Trace(ctx context.Context, traceID string) ([]model.Span, erro
 	for rows.Next() {
 		var s model.Span
 		var st time.Time
+		var dur uint64
 		var kind, status string
 		if err := rows.Scan(&s.TraceID, &s.SpanID, &s.ParentSpanID, &s.ServiceName,
-			&s.SpanName, &kind, &st, new(uint64), &status, &s.StatusMsg); err != nil {
+			&s.SpanName, &kind, &st, &dur, &status, &s.StatusMsg); err != nil {
 			return nil, err
 		}
 		s.Kind = model.SpanKind(kind)
 		s.StatusCode = model.StatusCode(status)
 		s.StartUnixNs = uint64(st.UnixNano())
+		// duration_ns is stored, end time is not: rebuild it so DurationNs() is correct.
+		s.EndUnixNs = s.StartUnixNs + dur
 		out = append(out, s)
 	}
 	return out, rows.Err()
@@ -104,6 +107,91 @@ func (q *Queries) Dependencies(ctx context.Context, since time.Duration) ([]Depe
 			return nil, err
 		}
 		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// ServiceStats is one row of the per-service overview: span volume, errors and
+// latency percentiles over the window, computed from every span of the service
+// (not only roots, which is what mv_service_latency covers).
+type ServiceStats struct {
+	Service string  `json:"service"`
+	Spans   uint64  `json:"spans"`
+	Errors  uint64  `json:"errors"`
+	P50Ms   float64 `json:"p50_ms"`
+	P95Ms   float64 `json:"p95_ms"`
+	P99Ms   float64 `json:"p99_ms"`
+}
+
+func (q *Queries) Services(ctx context.Context, since time.Duration) ([]ServiceStats, error) {
+	rows, err := q.conn.Query(ctx, `
+		SELECT service_name,
+		       count() AS spans,
+		       countIf(status_code = 'ERROR') AS errors,
+		       quantilesTDigest(0.50, 0.95, 0.99)(duration_ns) AS qs
+		FROM spans
+		WHERE start_time >= now64(9) - INTERVAL ? SECOND
+		GROUP BY service_name
+		ORDER BY spans DESC`, int(since.Seconds()))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ServiceStats
+	for rows.Next() {
+		var st ServiceStats
+		var qs []float64
+		if err := rows.Scan(&st.Service, &st.Spans, &st.Errors, &qs); err != nil {
+			return nil, err
+		}
+		if len(qs) == 3 {
+			st.P50Ms, st.P95Ms, st.P99Ms = qs[0]/1e6, qs[1]/1e6, qs[2]/1e6
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
+}
+
+// TraceSummary describes a trace by its root span, for picking one to open.
+type TraceSummary struct {
+	TraceID    string    `json:"trace_id"`
+	Service    string    `json:"service"`
+	Name       string    `json:"name"`
+	Start      time.Time `json:"start"`
+	DurationMs float64   `json:"duration_ms"`
+	Status     string    `json:"status"`
+}
+
+// RecentTraces lists root spans in the window, newest first, or slowest first
+// when slowest is true. errorsOnly keeps traces whose root span errored.
+func (q *Queries) RecentTraces(ctx context.Context, since time.Duration, slowest, errorsOnly bool, limit int) ([]TraceSummary, error) {
+	order := "start_time DESC"
+	if slowest {
+		order = "duration_ns DESC"
+	}
+	where := ""
+	if errorsOnly {
+		where = " AND status_code = 'ERROR'"
+	}
+	rows, err := q.conn.Query(ctx, `
+		SELECT trace_id, service_name, span_name, start_time, duration_ns, status_code
+		FROM spans
+		WHERE parent_span_id = '' AND start_time >= now64(9) - INTERVAL ? SECOND`+where+`
+		ORDER BY `+order+`
+		LIMIT ?`, int(since.Seconds()), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TraceSummary
+	for rows.Next() {
+		var t TraceSummary
+		var dur uint64
+		if err := rows.Scan(&t.TraceID, &t.Service, &t.Name, &t.Start, &dur, &t.Status); err != nil {
+			return nil, err
+		}
+		t.DurationMs = float64(dur) / 1e6
+		out = append(out, t)
 	}
 	return out, rows.Err()
 }

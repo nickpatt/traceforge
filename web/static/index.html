@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TraceForge</title>
+<meta name="description" content="TraceForge: traces, latency and service dependencies from the query API.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='3' width='9' height='2.5' rx='1' fill='%232563eb'/%3E%3Crect x='4' y='7' width='7' height='2.5' rx='1' fill='%230d9488'/%3E%3Crect x='6' y='11' width='9' height='2.5' rx='1' fill='%23d97706'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="./">TraceForge</a>
+  <div class="bar-controls">
+    <label class="field">
+      <span>Window</span>
+      <select id="window">
+        <option value="5m">5 min</option>
+        <option value="15m" selected>15 min</option>
+        <option value="1h">1 hour</option>
+        <option value="6h">6 hours</option>
+      </select>
+    </label>
+    <button type="button" class="btn" id="refresh">Refresh</button>
+    <span class="stamp" id="stamp" aria-live="polite"></span>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="panel services" aria-labelledby="svc-h">
+    <div class="panel-head">
+      <h2 id="svc-h">Services</h2>
+      <p class="hint">Latency of every span, by service. Bars run p50 to p99 on a log scale.</p>
+    </div>
+    <div class="table-wrap">
+      <table class="svc-table">
+        <thead>
+          <tr><th scope="col">Service</th><th scope="col" class="num">Spans</th><th scope="col" class="num">Errors</th><th scope="col" class="num">p50</th><th scope="col" class="num">p95</th><th scope="col" class="num">p99</th><th scope="col" class="range-col"><span class="sr">Latency range</span></th></tr>
+        </thead>
+        <tbody id="svc-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="scale" id="svc-scale" aria-hidden="true"></p>
+  </section>
+
+  <section class="panel deps" aria-labelledby="dep-h">
+    <div class="panel-head">
+      <h2 id="dep-h">Dependencies</h2>
+      <p class="hint">Who calls whom, from parent and child spans. Edge labels are call counts.</p>
+    </div>
+    <div class="graph" id="graph" role="img" aria-label="Service dependency graph"></div>
+    <ul class="sr" id="graph-list"></ul>
+  </section>
+
+  <section class="panel traces" aria-labelledby="tr-h">
+    <div class="panel-head">
+      <h2 id="tr-h">Traces</h2>
+      <div class="tabs" role="tablist" aria-label="Which traces">
+        <button type="button" role="tab" aria-selected="true" data-mode="recent">Recent</button>
+        <button type="button" role="tab" aria-selected="false" data-mode="slowest">Slowest</button>
+        <button type="button" role="tab" aria-selected="false" data-mode="errors">Failed</button>
+      </div>
+    </div>
+    <ol class="trace-list" id="trace-list"><li class="empty">Loading…</li></ol>
+  </section>
+
+  <section class="panel waterfall" aria-labelledby="wf-h">
+    <div class="panel-head">
+      <h2 id="wf-h">Waterfall</h2>
+      <p class="hint" id="wf-meta">Pick a trace to see its spans over time.</p>
+    </div>
+    <div class="wf" id="wf"></div>
+    <div class="detail" id="detail" aria-live="polite"></div>
+  </section>
+</main>
+
+<script src="app.js" defer></script>
+</body>
+</html>
