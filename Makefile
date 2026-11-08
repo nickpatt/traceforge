@@ -1,4 +1,4 @@
-.PHONY: help build test tidy up down logs bench loadgen fmt
+.PHONY: help build test tidy up down logs bench loadgen fmt ui
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -24,6 +24,9 @@ down: ## Stop the stack
 
 logs: ## Tail service logs
 	docker compose -f deploy/docker-compose.yml logs -f
+
+ui: ## Print the web UI URL (served by the query service)
+	@echo "TraceForge UI: http://localhost:8080"
 
 loadgen: ## Run the OTLP load generator against localhost collector
 	go run ./cmd/loadgen --endpoint localhost:4317 --rps 2000 --duration 60s
