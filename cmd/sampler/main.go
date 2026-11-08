@@ -16,6 +16,16 @@ import (
 func main() {
 	log := telemetry.NewLogger("sampler")
 
+	// Create the topics this service reads and writes; clients do not auto-create them.
+	topics := []kafka.TopicSpec{
+		{Name: config.TopicSpans, Partitions: int32(config.EnvInt("KAFKA_PARTITIONS", 12)), Replicas: 1},
+		{Name: config.TopicSpansKept, Partitions: int32(config.EnvInt("KAFKA_PARTITIONS", 12)), Replicas: 1},
+	}
+	if err := kafka.EnsureTopics(context.Background(), config.KafkaBrokers(), topics...); err != nil {
+		log.Error("kafka topics", "err", err)
+		return
+	}
+
 	consumer, err := kafka.NewConsumer(config.KafkaBrokers(), "sampler", config.TopicSpans)
 	if err != nil {
 		log.Error("consumer", "err", err)

@@ -15,6 +15,13 @@ import (
 func main() {
 	log := telemetry.NewLogger("collector")
 
+	// Create the topics this service needs; producers do not auto-create them.
+	topics := []kafka.TopicSpec{{Name: config.TopicSpans, Partitions: int32(config.EnvInt("KAFKA_PARTITIONS", 12)), Replicas: 1}}
+	if err := kafka.EnsureTopics(context.Background(), config.KafkaBrokers(), topics...); err != nil {
+		log.Error("kafka topics", "err", err)
+		return
+	}
+
 	producer, err := kafka.NewProducer(config.KafkaBrokers(), config.TopicSpans)
 	if err != nil {
 		log.Error("kafka producer", "err", err)
