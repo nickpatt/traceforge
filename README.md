@@ -69,11 +69,33 @@ curl "localhost:8080/api/dependencies?since=1h"
 curl "localhost:8080/api/traces/<trace_id>"
 ```
 
+## Web UI
+
+The query service also serves a small web UI at <http://localhost:8080>, built from
+`web/static` and embedded in the binary (no separate build step):
+
+- **Services**: span volume, error rate and p50/p95/p99 latency for every service, with
+  each service's p50 to p99 range drawn on a shared log scale.
+- **Dependencies**: who calls whom, from parent and child spans, with call counts; edges
+  carrying errors are red.
+- **Traces**: recent, slowest or failed traces; pick one to open its waterfall, with
+  spans nested under their parents on the trace's time axis.
+
+```bash
+make up        # Kafka, ClickHouse and the four services
+make loadgen   # send real OTLP traffic through the pipeline
+make ui        # prints the URL (http://localhost:8080)
+```
+
+![TraceForge web UI](docs/web-ui.webp)
+
 ## Query API
 
 | Endpoint                                   | Powers                        |
 |--------------------------------------------|-------------------------------|
+| `GET /api/traces?sort=&errors=&since=`     | Trace list (recent, slowest, failed) |
 | `GET /api/traces/:trace_id`                | Waterfall view                |
+| `GET /api/services?since=`                 | Per-service volume, errors, p50/p95/p99 |
 | `GET /api/latency?service=&since=`         | Latency heatmap (p50/p95/p99) |
 | `GET /api/dependencies?since=`             | Service dependency graph      |
 

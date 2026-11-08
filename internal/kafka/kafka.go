@@ -25,6 +25,7 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 		kgo.ProducerLinger(0),             // tune for throughput vs latency
 		kgo.MaxBufferedRecords(100_000),   // bounded buffer => backpressure
 		kgo.RequiredAcks(kgo.LeaderAck()), // acks=1
+		kgo.DisableIdempotentWrite(),      // idempotence needs acks=all; we trade it for latency
 		kgo.ProducerBatchMaxBytes(16<<20), // 16MiB batches
 	)
 	if err != nil {
@@ -45,7 +46,9 @@ func (p *Producer) Produce(ctx context.Context, s *model.Span, cb func(error)) e
 		Key:   []byte(s.TraceID),
 		Value: val,
 	}
-	p.cl.Produce(ctx, rec, func(_ *kgo.Record, err error) {
+	// The record outlives the caller (e.g. an OTLP request that returns as soon as
+	// spans are enqueued), so its delivery must not be cancelled with that context.
+	p.cl.Produce(context.WithoutCancel(ctx), rec, func(_ *kgo.Record, err error) {
 		if cb != nil {
 			cb(err)
 		}
